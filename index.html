@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Space Invaders - Quiz Científico (7º Ano)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #gameCanvas {
+      background: #000;
+      border: 1px solid #0a0;
+    }
+
+    #questionBox {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 30, 0, 0.85);
+      padding: 10px;
+      border: 1px solid #0f0;
+      border-radius: 6px;
+      text-align: center;
+      width: 90%;
+      max-width: 500px;
+      color: #0f0;
+      font-size: 14px;
+    }
+
+    #feedback {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 28px;
+      font-weight: bold;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 20px;
+      box-sizing: border-box;
+    }
+
+    #controls > div:first-child {
+      display: flex;
+      gap: 2px;
+    }
+
+    .btn {
+      width: 70px;
+      height: 70px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid #0f0;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: #0f0;
+      user-select: none;
+      touch-action: manipulation;
+      font-weight: bold;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+      background: rgba(0, 255, 255, 0.4);
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+    }
+
+    #gameOver {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      padding: 20px;
+      border: 2px solid red;
+      border-radius: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    #finalScore {
+      font-size: 24px;
+      color: #0f0;
+      margin-top: 10px;
+    }
+
+    #restartBtn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: #0a0;
+      border: none;
+      color: white;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #restartBtn:hover {
+      background: #0c0;
+    }
+  </style>
+</head>
+<body>
+  <div id="score">Pontuação: 0</div>
+  <div id="questionBox">
+    <div id="questionText">Carregando pergunta...</div>
+    <div id="optionsText"></div>
+  </div>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  
+  <div id="feedback"></div>
+
+  <div id="gameOver">
+    <div>🎮 GAME OVER</div>
+    <div id="finalScore">Sua pontuação: 0</div>
+    <button id="restartBtn">Recomeçar</button>
+  </div>
+
+  <div id="controls">
+    <div style="display: flex; gap: 2px;">
+      <div class="btn" id="leftBtn">←</div>
+      <div class="btn" id="rightBtn">→</div>
+    </div>
+    <div class="btn" id="fireBtn">🔫</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreDisplay = document.getElementById('score');
+    const questionText = document.getElementById('questionText');
+    const optionsText = document.getElementById('optionsText');
+    const feedbackEl = document.getElementById('feedback');
+    const gameOverDisplay = document.getElementById('gameOver');
+    const finalScoreDisplay = document.getElementById('finalScore');
+    const restartBtn = document.getElementById('restartBtn');
+    const leftBtn = document.getElementById('leftBtn');
+    const rightBtn = document.getElementById('rightBtn');
+    const fireBtn = document.getElementById('fireBtn');
+
+    let player = {
+      x: canvas.width / 2 - 20,
+      y: canvas.height - 50,
+      width: 40,
+      height: 30,
+      speed: 5,
+      dx: 0,
+      pulse: 0
+    };
+
+    let bullets = [];
+    const bulletSpeed = 7;
+    let particles = [];
+    let enemies = [];
+    const letters = ['A', 'B', 'C', 'D', 'E'];
+
+    // 🌟 ✅ BANCO DE PERGUNTAS — 35 QUESTÕES DE CIÊNCIAS DO 7º ANO
+    const questions = [
+      // Classificação dos Seres Vivos
+      { q: "Qual reino inclui organismos unicelulares sem núcleo?", o: ["A) Animal", "B) Plantae", "C) Fungi", "D) Monera", "E) Protista"], c: 'D' },
+      { q: "Os vírus pertencem a algum reino?", o: ["A) Sim, ao reino Monera", "B) Sim, ao reino Protista", "C) Não, pois não são considerados seres vivos por muitos cientistas", "D) Sim, ao reino Fungi", "E) Sim, ao reino Animal"], c: 'C' },
+      { q: "Qual característica define os seres do reino Fungi?", o: ["A) Fazem fotossíntese", "B) São todos unicelulares", "C) Nutrem-se por absorção de matéria orgânica", "D) Têm cloroplastos", "E) São produtores"], c: 'C' },
+      { q: "Qual reino é formado por organismos que fazem fotossíntese?", o: ["A) Animal", "B) Fungi", "C) Protista", "D) Plantae", "E) Monera"], c: 'D' },
+      { q: "O que diferencia células procarióticas de eucarióticas?", o: ["A) Presença de parede celular", "B) Presença de núcleo organizado", "C) Tamanho da célula", "D) Forma da célula", "E) Quantidade de organelas"], c: 'B' },
+
+      // Ecologia
+      { q: "O que é uma cadeia alimentar?", o: ["A) Lista de animais em extinção", "B) Sequência de transferência de energia entre seres vivos", "C) Relação entre predador e presa apenas", "D) Ciclo da água", "E) Conjunto de plantas de um ecossistema"], c: 'B' },
+      { q: "O que é um produtor em uma cadeia alimentar?", o: ["A) Animal que come plantas", "B) Fungo decompositor", "C) Ser que faz fotossíntese", "D) Animal carnívoro", "E) Ser que consome outros"], c: 'C' },
+      { q: "Qual é o principal bioma brasileiro?", o: ["A) Caatinga", "B) Cerrado", "C) Pantanal", "D) Amazônia", "E) Mata Atlântica"], c: 'D' },
+      { q: "O que é uma relação de mutualismo?", o: ["A) Um ser se beneficia e o outro é prejudicado", "B) Ambos os seres se beneficiam", "C) Um ser se beneficia e o outro não é afetado", "D) Competição por alimento", "E) Predação"], c: 'B' },
+      { q: "O que é biodiversidade?", o: ["A) Quantidade de água em um ecossistema", "B) Variedade de espécies em um local", "C) Número de predadores", "D) Temperatura média", "E) Presença de plantas apenas"], c: 'B' },
+
+      // Ciclos e Meio Ambiente
+      { q: "Qual é a principal fonte de energia para os ecossistemas?", o: ["A) Água", "B) Solo", "C) Sol", "D) Oxigênio", "E) Carbono"], c: 'C' },
+      { q: "O que é reciclagem?", o: ["A) Queima de lixo", "B) Reutilização de materiais para fabricar novos produtos", "C) Descarte em aterros", "D) Poluição do solo", "E) Uso de embalagens descartáveis"], c: 'B' },
+      { q: "Qual desses recursos é renovável?", o: ["A) Petróleo", "B) Carvão", "C) Gás natural", "D) Madeira (com manejo)", "E) Minérios"], c: 'D' },
+      { q: "O que causa o efeito estufa?", o: ["A) Diminuição do oxigênio", "B) Aumento de gases como CO₂ na atmosfera", "C) Redução da camada de ozônio", "D) Poluição sonora", "E) Desmatamento apenas"], c: 'B' },
+      { q: "Qual é o principal gás consumido na respiração?", o: ["A) Nitrogênio", "B) Dióxido de carbono", "C) Oxigênio", "D) Metano", "E) Hidrogênio"], c: 'C' },
+
+      // Seres Microscópicos
+      { q: "Qual desses organismos é unicelular?", o: ["A) Cachorro", "B) Samambaia", "C) Cogumelo", "D) Bactéria", "E) Pinheiro"], c: 'D' },
+      { q: "O que são protozoários?", o: ["A) Fungos multicelulares", "B) Bactérias patogênicas", "C) Seres unicelulares eucarióticos", "D) Plantas aquáticas", "E) Vírus gigantes"], c: 'C' },
+      { q: "Qual doença é causada por protozoário?", o: ["A) Gripe", "B) Tuberculose", "C) Malária", "D) Sarampo", "E) Catapora"], c: 'C' },
+      { q: "As algas pertencem a qual reino?", o: ["A) Plantae", "B) Fungi", "C) Monera", "D) Protista", "E) Animal"], c: 'D' },
+      { q: "Qual é a principal função das bactérias decompositoras?", o: ["A) Causar doenças", "B) Produzir oxigênio", "C) Degradar matéria orgânica morta", "D) Fazer fotossíntese", "E) Produzir alimentos"], c: 'C' },
+
+      // Clima, Tempo e Água
+      { q: "Qual é a diferença entre clima e tempo?", o: ["A) Clima é de um dia; tempo é de anos", "B) Clima é o estado médio da atmosfera em longo prazo; tempo é o estado em um momento", "C) Clima é frio; tempo é quente", "D) Não há diferença", "E) Tempo é o que vemos no noticiário"], c: 'B' },
+      { q: "O que é o ciclo da água?", o: ["A) Movimento de água entre oceanos, atmosfera e terra", "B) Congelamento de rios", "C) Poluição dos rios", "D) Evaporação apenas", "E) Chuva constante"], c: 'A' },
+      { q: "Qual processo transforma vapor de água em nuvens?", o: ["A) Evaporação", "B) Fusão", "C) Condensação", "D) Solidificação", "E) Sublimação"], c: 'C' },
+      { q: "O que é umidade do ar?", o: ["A) Quantidade de oxigênio", "B) Quantidade de vapor de água na atmosfera", "C) Temperatura do ar", "D) Pressão atmosférica", "E) Poluição do ar"], c: 'B' },
+      { q: "Qual fenômeno ocorre quando o vapor d’água vira gelo diretamente?", o: ["A) Evaporação", "B) Fusão", "C) Sublimação", "D) Solidificação", "E) Condensação"], c: 'C' },
+
+      // Recursos Naturais
+      { q: "O que são recursos naturais não renováveis?", o: ["A) Recursos que se renovam rapidamente", "B) Recursos que não se esgotam", "C) Recursos que demoram milhões de anos para se formar", "D) Água e vento", "E) Plantas cultivadas"], c: 'C' },
+      { q: "Qual é um exemplo de recurso hídrico?", o: ["A) Petróleo", "B) Carvão", "C) Rio", "D) Ferro", "E) Gás natural"], c: 'C' },
+      { q: "O que é sustentabilidade?", o: ["A) Usar todos os recursos agora", "B) Viver sem tecnologia", "C) Atender às necessidades atuais sem comprometer as futuras gerações", "D) Poluir menos", "E) Plantar árvores apenas"], c: 'C' },
+      { q: "Qual é a principal causa do desmatamento na Amazônia?", o: ["A) Turismo", "B) Agricultura e pecuária", "C) Chuvas fortes", "D) Incêndios naturais", "E) Mineração de ouro (menos impacto que B)"], c: 'B' },
+      { q: "O que é poluição?", o: ["A) Limpeza do ambiente", "B) Introdução de substâncias que causam desequilíbrio ambiental", "C) Reciclagem", "D) Plantio de árvores", "E) Uso de energia solar"], c: 'B' },
+
+      // Classificação e Diversidade
+      { q: "Quantos reinos existem na classificação mais usada no 7º ano?", o: ["A) 2", "B) 3", "C) 5", "D) 6", "E) 4"], c: 'C' },
+      { q: "Qual reino inclui leveduras e cogumelos?", o: ["A) Protista", "B) Monera", "C) Fungi", "D) Plantae", "E) Animal"], c: 'C' },
+      { q: "O que significa 'autótrofo'?", o: ["A) Ser que se alimenta de outros", "B) Ser que produz seu próprio alimento", "C) Ser que vive na água", "D) Ser unicelular", "E) Ser que não respira"], c: 'B' },
+      { q: "Qual é o habitat de um organismo?", o: ["A) Sua alimentação", "B) Seu local de vida", "C) Seu modo de reprodução", "D) Seu tamanho", "E) Seu reino"], c: 'B' },
+      { q: "O que é uma espécie?", o: ["A) Grupo de seres diferentes", "B) Conjunto de indivíduos que podem se reproduzir e gerar filhos férteis", "C) Qualquer ser vivo", "D) Um reino inteiro", "E) Um tipo de célula"], c: 'B' }
+    ];
+
+    let score = 0;
+    let currentQuestion = null;
+    let gameRunning = true;
+
+    function showFeedback(text, color = '#fff') {
+      feedbackEl.textContent = text;
+      feedbackEl.style.color = color;
+      feedbackEl.style.opacity = '1';
+      setTimeout(() => {
+        feedbackEl.style.opacity = '0';
+      }, 1200);
+    }
+
+    function createExplosion(x, y) {
+      const colors = ['#ff9000', '#ff5500', '#ff2200', '#ffffff', '#ffcc00'];
+      const particleCount = 80;
+      for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 4 + 1;
+        const size = Math.random() * 4 + 1;
+        const life = Math.random() * 60 + 30;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: size,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          life: life,
+          maxLife: life
+        });
+      }
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.05;
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function drawParticles() {
+      for (const p of particles) {
+        const alpha = p.life / p.maxLife;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawPlayer() {
+      const x = player.x;
+      const y = player.y;
+
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 4;
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.ellipse(x + player.width / 2, y + player.height + 10, 20, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      const gradient = ctx.createLinearGradient(x, y, x, y + player.height);
+      gradient.addColorStop(0, '#e0e0ff');
+      gradient.addColorStop(0.5, '#ffffff');
+      gradient.addColorStop(1, '#b0b0ff');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.moveTo(x + player.width / 2, y);
+      ctx.lineTo(x, y + player.height);
+      ctx.lineTo(x + player.width, y + player.height);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y + player.height - 3);
+      ctx.lineTo(x - 8, y + player.height + 12);
+      ctx.lineTo(x, y + player.height);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + player.width, y + player.height - 3);
+      ctx.lineTo(x + player.width + 8, y + player.height + 12);
+      ctx.lineTo(x + player.width, y + player.height);
+      ctx.stroke();
+
+      player.pulse += 0.1;
+      const pulseIntensity = 0.5 + 0.5 * Math.sin(player.pulse);
+      ctx.fillStyle = `rgba(0, 180, 255, ${pulseIntensity})`;
+      ctx.beginPath();
+      ctx.moveTo(x + 8, y + player.height);
+      ctx.lineTo(x + 12, y + player.height + 10);
+      ctx.lineTo(x + 16, y + player.height);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + player.width - 8, y + player.height);
+      ctx.lineTo(x + player.width - 12, y + player.height + 10);
+      ctx.lineTo(x + player.width - 16, y + player.height);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#0f0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + player.width / 2, y - 5);
+      ctx.lineTo(x + player.width / 2, y - 12);
+      ctx.stroke();
+      ctx.fillStyle = '#0f0';
+      ctx.beginPath();
+      ctx.arc(x + player.width / 2, y - 13, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function loadQuestion() {
+      const q = questions[Math.floor(Math.random() * questions.length)];
+      currentQuestion = q;
+      questionText.textContent = q.q;
+      optionsText.innerHTML = q.o.join('<br>');
+    }
+
+    function spawnEnemies() {
+      enemies = [];
+      for (let i = 0; i < 5; i++) {
+        enemies.push({
+          x: 30 + i * 70,
+          y: Math.random() * 100,
+          width: 30,
+          height: 30,
+          speedX: (Math.random() - 0.5) * 2,
+          speedY: 0.4 + Math.random() * 0.3,
+          letter: letters[i]
+        });
+      }
+    }
+
+    function drawBullets() {
+      for (let b of bullets) {
+        ctx.fillStyle = '#0f0';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#0ff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x, b.y + 12);
+        ctx.stroke();
+      }
+    }
+
+    function drawEnemy(e) {
+      ctx.fillStyle = '#0a0';
+      ctx.beginPath();
+      ctx.arc(e.x + e.width / 2, e.y + e.height / 2, e.width / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#0a0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(e.x + e.width / 3, e.y + e.height / 3);
+      ctx.lineTo(e.x + e.width / 3 - 6, e.y + e.height / 4 - 4);
+      ctx.moveTo(e.x + 2 * e.width / 3, e.y + e.height / 3);
+      ctx.lineTo(e.x + 2 * e.width / 3 + 6, e.y + e.height / 4 - 4);
+      ctx.stroke();
+
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(e.x + e.width / 3, e.y + e.height / 3, 4, 0, Math.PI * 2);
+      ctx.arc(e.x + 2 * e.width / 3, e.y + e.height / 3, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(e.x + e.width / 4, e.y + 2 * e.height / 3);
+      ctx.lineTo(e.x + 3 * e.width / 4, e.y + 2 * e.height / 3);
+      ctx.stroke();
+
+      ctx.font = 'bold 14px Arial';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.letter, e.x + e.width / 2, e.y + e.height / 2 + 5);
+    }
+
+    function updatePlayer() {
+      player.x += player.dx;
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    }
+
+    function updateBullets() {
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        bullets[i].y -= bulletSpeed;
+        if (bullets[i].y < 0) bullets.splice(i, 1);
+      }
+    }
+
+    function updateEnemies() {
+      for (let e of enemies) {
+        e.x += e.speedX;
+        if (e.x <= 0 || e.x + e.width >= canvas.width) e.speedX *= -1;
+        if (e.y < player.y) e.y += e.speedY;
+
+        if (
+          e.x < player.x + player.width &&
+          e.x + e.width > player.x &&
+          e.y < player.y + player.height &&
+          e.y + e.height > player.y
+        ) {
+          createExplosion(player.x + player.width / 2, player.y + player.height / 2);
+          showFeedback("Errado! Fim de jogo.", 'red');
+          setTimeout(endGame, 600);
+        }
+      }
+    }
+
+    function detectCollisions() {
+      for (let b of bullets) {
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          let e = enemies[i];
+          if (
+            b.x < e.x + e.width &&
+            b.x + 3 > e.x &&
+            b.y < e.y + e.height &&
+            b.y + 12 > e.y
+          ) {
+            bullets.splice(bullets.indexOf(b), 1);
+            createExplosion(e.x + e.width / 2, e.y + e.height / 2);
+
+            if (e.letter === currentQuestion.c) {
+              showFeedback("Correto!", '#0f0');
+              score += 100;
+              scoreDisplay.textContent = `Pontuação: ${score}`;
+              setTimeout(() => {
+                loadQuestion();
+                spawnEnemies();
+              }, 600);
+            } else {
+              showFeedback("Errado! Fim de jogo.", 'red');
+              setTimeout(endGame, 600);
+            }
+          }
+        }
+      }
+    }
+
+    function endGame() {
+      gameRunning = false;
+      finalScoreDisplay.textContent = `Sua pontuação: ${score}`;
+      gameOverDisplay.style.display = 'block';
+    }
+
+    function resetGame() {
+      player.x = canvas.width / 2 - 20;
+      player.dx = 0;
+      bullets = [];
+      particles = [];
+      score = 0;
+      scoreDisplay.textContent = 'Pontuação: 0';
+      gameOverDisplay.style.display = 'none';
+      gameRunning = true;
+      loadQuestion();
+      spawnEnemies();
+      gameLoop();
+    }
+
+    function gameLoop() {
+      if (!gameRunning) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawPlayer();
+      drawBullets();
+      enemies.forEach(drawEnemy);
+      drawParticles();
+
+      updatePlayer();
+      updateBullets();
+      updateEnemies();
+      detectCollisions();
+      updateParticles();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function shoot() {
+      if (!gameRunning) return;
+      bullets.push({ x: player.x + player.width / 2, y: player.y });
+    }
+
+    leftBtn.addEventListener('touchstart', e => { e.preventDefault(); player.dx = -player.speed; });
+    leftBtn.addEventListener('touchend', e => { e.preventDefault(); if (player.dx < 0) player.dx = 0; });
+    rightBtn.addEventListener('touchstart', e => { e.preventDefault(); player.dx = player.speed; });
+    rightBtn.addEventListener('touchend', e => { e.preventDefault(); if (player.dx > 0) player.dx = 0; });
+    fireBtn.addEventListener('touchstart', e => { e.preventDefault(); shoot(); });
+
+    leftBtn.addEventListener('mousedown', () => { player.dx = -player.speed; });
+    leftBtn.addEventListener('mouseup', () => { if (player.dx < 0) player.dx = 0; });
+    rightBtn.addEventListener('mousedown', () => { player.dx = player.speed; });
+    rightBtn.addEventListener('mouseup', () => { if (player.dx > 0) player.dx = 0; });
+    fireBtn.addEventListener('mousedown', shoot);
+
+    restartBtn.addEventListener('click', resetGame);
+
+    loadQuestion();
+    spawnEnemies();
+    gameLoop();
+  </script>
+</body>
+</html>
